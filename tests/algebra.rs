@@ -164,3 +164,41 @@ fn structural_json_contract() {
         assert!(rational(input).is_err(), "{input}");
     }
 }
+
+#[test]
+fn registered_identity_precedes_conversion() {
+    use unitsml_rs::IdentifiedQuantity;
+    let db = Register::default();
+    let term = UnitTerm::new("deg");
+    let identity = db.identify(std::slice::from_ref(&term)).unwrap();
+    assert_eq!(identity.terms()[0].unit, "NISTu149");
+    let nominal = IdentifiedQuantity::new(n("3/2"), identity);
+    assert_eq!(nominal.magnitude(), &n("3/2"));
+    assert_eq!(
+        nominal.with_conversions(&db),
+        Err(Error::MissingConversion("NISTu149".into()))
+    );
+    let mut supplied = Register::default();
+    supplied
+        .insert(
+            "deg",
+            Registration {
+                dimensions: [("PlaneAngle".to_owned(), n("1"))].into(),
+                factor: n("1/360"),
+                offset: n("0"),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        nominal
+            .with_conversions(&supplied)
+            .unwrap()
+            .canonical_magnitude(),
+        n("1/240")
+    );
+    let nominal = unitsml_rs::evaluate_json(
+        br#"{"op":"identify","left":{"value":"3/2","terms":[{"unit":"deg"}]}}"#,
+    );
+    assert_eq!(nominal["value"]["magnitude"], "3/2");
+    assert_eq!(nominal["value"]["terms"][0]["unit"], "NISTu149");
+}

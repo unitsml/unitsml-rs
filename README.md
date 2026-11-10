@@ -17,6 +17,11 @@ assert_eq!(converted.magnitude(), &rational("293.15")?);
 # Ok::<(), unitsml_rs::Error>(())
 ```
 
+Use `Register::identify` and `IdentifiedQuantity::new` to construct a quantity
+from known UnitsDB identities even when conversion or scale data is unavailable
+or inconsistent. `IdentifiedQuantity::with_conversions` checks those data
+before producing a quantity suitable for arithmetic.
+
 Magnitudes and dimension exponents are arbitrary-precision rationals. Composite
 units retain the exact canonical factor and cancel zero dimension exponents.
 `dimension_id` returns a UnitsDB ID when the nonempty integer dimension vector is
@@ -56,7 +61,7 @@ returned buffer with `unitsml_free_json_v1`. Rust callers can also use
 {"op":"convert","left":{"value":"20","model":{"unitName":"degC"}},"right":{"terms":[{"unit":"K"}]}}
 ```
 
-Operations are `resolve`, `convert`, `add`, `subtract`, `multiply`, `divide`,
+Operations are `identify`, `resolve`, `convert`, `add`, `subtract`, `multiply`, `divide`,
 `compare`, `ratio`, `scale`, and `divide_by`. An operand has a string `value`,
 optional boolean `difference`, and either `model` or `terms`. A term has a
 string `unit` and optional string `prefix` and `power`. Omitting both unit forms
@@ -65,7 +70,7 @@ makes a scalar. `convert` needs only the target unit on the right. `scale` and
 `unit`, `dimensions`, `factor`, and `offset` (default zero). Numeric fields
 and register dimension exponents are exact strings.
 
-Replies carry `abi_version` and `class`. A quantity value contains `magnitude`,
+Replies carry `abi_version` and `class`. An `identify` value contains exact `magnitude` and resolved `terms`. A conversion-ready quantity value contains `magnitude`,
 `canonical_magnitude`, `dimension_id`, `dimensions`, `scale`, and resolved
 `terms`. `compare` returns −1, 0, or 1 and `ratio` returns a rational string.
 Refusals carry an `error` object with a stable `code` and a diagnostic `detail`.

@@ -128,6 +128,47 @@ impl UnitTerm {
     }
 }
 
+/// Unit identity as registered by UnitsDB, independent of its conversion data.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct IdentifiedUnit {
+    terms: Vec<UnitTerm>,
+}
+
+impl IdentifiedUnit {
+    pub fn terms(&self) -> &[UnitTerm] {
+        &self.terms
+    }
+}
+
+/// A magnitude with known unit identities. Resolve conversion metadata before
+/// doing dimensional or scale-aware arithmetic.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct IdentifiedQuantity {
+    magnitude: Rational,
+    unit: IdentifiedUnit,
+}
+
+impl IdentifiedQuantity {
+    pub fn new(magnitude: Rational, unit: IdentifiedUnit) -> Self {
+        Self { magnitude, unit }
+    }
+
+    pub fn magnitude(&self) -> &Rational {
+        &self.magnitude
+    }
+
+    pub fn unit(&self) -> &IdentifiedUnit {
+        &self.unit
+    }
+
+    pub fn with_conversions(&self, register: &Register) -> Result<Quantity, Error> {
+        Ok(Quantity::new(
+            self.magnitude.clone(),
+            register.resolve_identified(&self.unit)?,
+        ))
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Unit {
     terms: Vec<UnitTerm>,

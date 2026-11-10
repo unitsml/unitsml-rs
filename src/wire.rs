@@ -1,3 +1,4 @@
+use crate::IdentifiedQuantity;
 use crate::{
     rational, terms_from_asciiunits, Error, Quantity, Rational, Register, Registration, Scale,
     Unit, UnitTerm,
@@ -103,6 +104,15 @@ fn evaluate(request: &Value) -> Result<Value, WireError> {
             )?;
         }
     }
+    if op == "identify" {
+        let left = &request["left"];
+        let unit = db.identify(&unit_terms(left)?)?;
+        let quantity = IdentifiedQuantity::new(number(&left["value"], "operand.value")?, unit);
+        return Ok(json!({
+            "magnitude": quantity.magnitude().to_string(),
+            "terms": terms_json(quantity.unit().terms()),
+        }));
+    }
     let left = quantity(&db, &request["left"])?;
     let right = || quantity(&db, &request["right"]);
     let scalar = || number(&request["scalar"], "scalar");
@@ -137,19 +147,13 @@ fn evaluate(request: &Value) -> Result<Value, WireError> {
         Scale::Interval => "interval",
         Scale::Difference => "difference",
     };
-    let terms: Vec<_> = output
-        .unit()
-        .terms()
-        .iter()
-        .map(|term| json!({"unit":term.unit,"prefix":term.prefix,"power":term.power.to_string()}))
-        .collect();
     Ok(json!({
         "magnitude": output.magnitude().to_string(),
         "canonical_magnitude": output.canonical_magnitude().to_string(),
         "dimension_id": output.unit().dimension_id(),
         "dimensions": dimensions,
         "scale": scale,
-        "terms": terms,
+        "terms": terms_json(output.unit().terms()),
     }))
 }
 
@@ -168,13 +172,30 @@ fn quantity(db: &Register, value: &Value) -> Result<Quantity, WireError> {
     })
 }
 
+fn terms_json(terms: &[UnitTerm]) -> Vec<Value> {
+    terms
+        .iter()
+        .map(|term| {
+            json!({
+                "unit": term.unit,
+                "prefix": term.prefix,
+                "power": term.power.to_string(),
+            })
+        })
+        .collect()
+}
+
 fn unit(db: &Register, value: &Value) -> Result<Unit, WireError> {
+    Ok(db.resolve(&unit_terms(value)?)?)
+}
+
+fn unit_terms(value: &Value) -> Result<Vec<UnitTerm>, WireError> {
     fields(
         value,
         &["value", "terms", "model", "difference"],
         "operand fields",
     )?;
-    let terms = match (value.get("model"), value.get("terms")) {
+    Ok(match (value.get("model"), value.get("terms")) {
         (Some(_), Some(_)) => return Err(invalid("operand has both model and terms")),
         (Some(model), None) => terms_from_asciiunits(model)?,
         (None, Some(terms)) => {
@@ -198,8 +219,7 @@ fn unit(db: &Register, value: &Value) -> Result<Unit, WireError> {
                 .collect::<Result<_, WireError>>()?
         }
         (None, None) => Vec::new(),
-    };
-    Ok(db.resolve(&terms)?)
+    })
 }
 
 fn code(error: &Error) -> &'static str {

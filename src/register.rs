@@ -1,4 +1,4 @@
-use super::{rational, Dimensions, Error, Rational, Scale, Unit, UnitTerm};
+use super::{rational, Dimensions, Error, IdentifiedUnit, Rational, Scale, Unit, UnitTerm};
 use num_traits::{One, Signed, ToPrimitive, Zero};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -43,19 +43,43 @@ impl Register {
         Ok(())
     }
 
-    pub fn resolve(&self, terms: &[UnitTerm]) -> Result<Unit, Error> {
+    pub fn identify(&self, terms: &[UnitTerm]) -> Result<IdentifiedUnit, Error> {
         if terms.len() > 256 {
             return Err(Error::ResourceLimit);
         }
+        let terms = terms
+            .iter()
+            .map(|term| {
+                let unit = record_id(unit(&term.unit)?)?.to_owned();
+                let prefix = term
+                    .prefix
+                    .as_deref()
+                    .map(prefix)
+                    .transpose()?
+                    .map(record_id)
+                    .transpose()?
+                    .map(str::to_owned);
+                Ok(UnitTerm {
+                    unit,
+                    prefix,
+                    power: term.power.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+        Ok(IdentifiedUnit { terms })
+    }
+
+    pub fn resolve(&self, terms: &[UnitTerm]) -> Result<Unit, Error> {
+        self.resolve_identified(&self.identify(terms)?)
+    }
+
+    pub(crate) fn resolve_identified(&self, unit_identity: &IdentifiedUnit) -> Result<Unit, Error> {
+        let terms = unit_identity.terms();
         let mut result = Unit::identity();
         for term in terms {
             let record = unit(&term.unit)?;
             let scale = scale(record)?;
-            let prefix_record = term.prefix.as_deref().map(prefix).transpose()?;
-            let prefix = match prefix_record {
-                Some(record) => prefix_power(record)?,
-                None => Rational::one(),
-            };
+            let prefix = prefix_factor(term.prefix.as_deref())?;
             if scale == Scale::Interval
                 && (terms.len() != 1 || !term.power.is_one() || !prefix.is_one())
             {
@@ -67,11 +91,7 @@ impl Register {
                 return Err(Error::AffineComposition);
             }
             let leaf = Unit {
-                terms: vec![UnitTerm {
-                    unit: record_id(record)?.to_owned(),
-                    prefix: prefix_record.map(record_id).transpose()?.map(str::to_owned),
-                    power: term.power.clone(),
-                }],
+                terms: vec![term.clone()],
                 dimensions,
                 factor: pow_exact(&(factor * prefix), &term.power)?,
                 offset,

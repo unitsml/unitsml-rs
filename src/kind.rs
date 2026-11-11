@@ -111,10 +111,14 @@ impl QuantityKind {
         let flagged: Vec<_> = refs.iter().filter(|r| r["primary"] == true).collect();
         let chosen = match flagged.len() {
             1 => flagged[0],
-            0 if refs.len() == 1 => &refs[0],
+            // A sole reference with NO primary flag is the unit's primary
+            // quantity: UnitsDB marks primaries only where a unit has several
+            // references (schema 2.2.0, unitsdb 6f3d156). An explicit
+            // `primary: false` is never promoted (unitsml-ruby c4821ee).
+            0 if refs.len() == 1 && refs[0].get("primary").is_none() => &refs[0],
             0 => {
                 return Err(KindError::Primary(format!(
-                    "unit {unit_id:?} has {} quantity references and none is marked primary",
+                    "unit {unit_id:?} has {} quantity reference(s) and none is marked primary",
                     refs.len()
                 )))
             }

@@ -74,3 +74,11 @@ Replies carry `abi_version` and `class`. An `identify` value contains exact `mag
 `canonical_magnitude`, `dimension_id`, `dimensions`, `scale`, and resolved
 `terms`. `compare` returns −1, 0, or 1 and `ratio` returns a rational string.
 Refusals carry an `error` object with a stable `code` and a diagnostic `detail`.
+
+The same caller register decoder is available to Rust callers through
+`decode_register(Option<&serde_json::Value>) -> Result<Register, WireError>`.
+Pass `None` for an independent default register or a reference to the existing
+array of `{unit, dimensions, factor, offset?}` entries. Failures retain their
+typed algebra error or malformed-field detail. A failed decode returns no
+partially populated register. Duplicate unit definitions keep the existing
+last-entry behavior.

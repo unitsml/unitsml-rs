@@ -337,13 +337,7 @@ impl Quantity {
             self.scale != Scale::Difference,
             rhs.scale == Scale::Difference,
         );
-        if !absolute && !difference {
-            if subtract {
-                return Err(Error::ScaleOperation {
-                    scale: Scale::Difference,
-                    operation: "difference minus absolute",
-                });
-            }
+        if !absolute && !difference && !subtract {
             return rhs.add(self);
         }
         let aligned = rhs.convert(&self.unit)?.magnitude;

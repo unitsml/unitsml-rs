@@ -1,14 +1,16 @@
 //! Exact quantity operations over structural unit operands and the UnitsDB register.
 mod asciiunits;
 mod ffi;
+mod kind;
 mod register;
 mod wire;
 
 pub use asciiunits::terms_from_asciiunits;
+pub use kind::{combine_kinds, KindError, QuantityKind};
 
 pub use num_rational::BigRational as Rational;
 pub use register::{Register, Registration};
-pub use wire::evaluate_json;
+pub use wire::{decode_register, evaluate_json, WireError};
 
 use num_bigint::BigInt;
 use num_traits::{One, Zero};

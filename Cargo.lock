@@ -139,6 +139,7 @@ checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 [[package]]
 name = "unitsdb-rs"
 version = "0.1.0"
+source = "git+https://github.com/unitsml/unitsdb-rs?rev=969a131b8992930a6ff6f869291f1f0d7cb68d33#969a131b8992930a6ff6f869291f1f0d7cb68d33"
 dependencies = [
  "serde_json",
 ]

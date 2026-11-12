@@ -28,9 +28,28 @@ pub(crate) fn refusal(class: &str, code: &str, detail: &str) -> Value {
     json!({"abi_version":1,"class":class,"error":{"code":code,"detail":detail}})
 }
 
-enum WireError {
+#[derive(Debug)]
+pub enum WireError {
     Algebra(Error),
     Invalid(String),
+}
+
+impl std::fmt::Display for WireError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Algebra(error) => error.fmt(formatter),
+            Self::Invalid(detail) => formatter.write_str(detail),
+        }
+    }
+}
+
+impl std::error::Error for WireError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Algebra(error) => Some(error),
+            Self::Invalid(_) => None,
+        }
+    }
 }
 
 impl From<Error> for WireError {
@@ -59,15 +78,12 @@ fn number(value: &Value, field: &str) -> Result<Rational, WireError> {
     Ok(rational(text(value, field)?)?)
 }
 
-fn evaluate(request: &Value) -> Result<Value, WireError> {
-    fields(
-        request,
-        &["op", "left", "right", "scalar", "register"],
-        "request fields",
-    )?;
-    let op = text(&request["op"], "op")?;
+/// Decode caller-owned conversion overrides using the structural ABI-v1
+/// array format. Missing entries select an independent default register.
+/// No partially populated register escapes when a field or definition fails.
+pub fn decode_register(entries: Option<&Value>) -> Result<Register, WireError> {
     let mut db = Register::default();
-    if let Some(entries) = request.get("register") {
+    if let Some(entries) = entries {
         let entries = entries.as_array().ok_or_else(|| invalid("register"))?;
         if entries.len() > 256 {
             return Err(Error::ResourceLimit.into());
@@ -104,6 +120,17 @@ fn evaluate(request: &Value) -> Result<Value, WireError> {
             )?;
         }
     }
+    Ok(db)
+}
+
+fn evaluate(request: &Value) -> Result<Value, WireError> {
+    fields(
+        request,
+        &["op", "left", "right", "scalar", "register"],
+        "request fields",
+    )?;
+    let op = text(&request["op"], "op")?;
+    let db = decode_register(request.get("register"))?;
     if op == "identify" {
         let left = &request["left"];
         let unit = db.identify(&unit_terms(left)?)?;

@@ -337,9 +337,6 @@ impl Quantity {
             self.scale != Scale::Difference,
             rhs.scale == Scale::Difference,
         );
-        if !absolute && !difference && !subtract {
-            return rhs.add(self);
-        }
         let aligned = rhs.convert(&self.unit)?.magnitude;
         let magnitude = if subtract {
             &self.magnitude - aligned

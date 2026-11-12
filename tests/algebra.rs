@@ -26,7 +26,7 @@ fn affine_endpoints_and_scale() {
     let difference = difference.convert(k.unit()).unwrap();
     assert_eq!(difference.magnitude(), &n("5"));
     assert_eq!(difference.scale(), Scale::Difference);
-    assert_eq!(difference.add(&c).unwrap().magnitude(), &n("25"));
+    assert_eq!(difference.add(&c).unwrap().magnitude(), &n("5963/20"));
     assert_eq!(c.subtract(&difference).unwrap().magnitude(), &n("15"));
     let shifted = difference.subtract(&c).unwrap();
     assert_eq!(shifted.magnitude(), &n("-5763/20"));
@@ -257,11 +257,6 @@ fn point_and_difference_sums_match_ruby() {
             expected.canonical_magnitude(),
             "{case}"
         );
-        // Ruby expresses a difference plus a point in the difference's
-        // unit; Rust expresses it in the point's unit. Same canonical value.
-        if ld && !rd && op == '+' && lu != ru {
-            continue;
-        }
         assert_eq!(output.magnitude(), &n(magnitude), "{case}");
         assert_eq!(output.unit(), expected.unit(), "{case}");
         assert_eq!(output.scale(), scale, "{case}");

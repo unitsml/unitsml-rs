@@ -111,8 +111,14 @@ impl Register {
         seen: &mut Vec<&'static str>,
     ) -> Result<(Rational, Rational), Error> {
         let id = record_id(record)?;
-        if let Some(entry) = self.entries.get(id) {
-            return Ok((entry.factor.clone(), entry.offset.clone()));
+        // A caller registration applies only to the unit the request names,
+        // not to units reached through its si_derived_bases/root_units chain
+        // (unitsml-ruby Conversion::Register#entry_for is consulted only for
+        // the directly identified unit). The top-level call has an empty chain.
+        if seen.is_empty() {
+            if let Some(entry) = self.entries.get(id) {
+                return Ok((entry.factor.clone(), entry.offset.clone()));
+            }
         }
         if let Some(affine) = canonical(record)? {
             return Ok(affine);

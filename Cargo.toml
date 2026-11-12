@@ -11,7 +11,7 @@ include = ["src/**", "tests/**", "include/**", "README.md", "LICENSE.md"]
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-unitsdb-rs = { version = "=0.1.0", git = "https://github.com/unitsml/unitsdb-rs", rev = "c631488e03f58c5cfd0ada369948b946a23a4f42" }
+unitsdb-rs = { version = "=0.1.0", git = "https://github.com/unitsml/unitsdb-rs", rev = "969a131b8992930a6ff6f869291f1f0d7cb68d33" }
 num-bigint = "0.4.6"
 num-rational = "0.4.2"
 num-traits = "0.2.19"

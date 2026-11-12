@@ -28,10 +28,10 @@ fn affine_endpoints_and_scale() {
     assert_eq!(difference.scale(), Scale::Difference);
     assert_eq!(difference.add(&c).unwrap().magnitude(), &n("25"));
     assert_eq!(c.subtract(&difference).unwrap().magnitude(), &n("15"));
-    assert!(matches!(
-        difference.subtract(&c),
-        Err(Error::ScaleOperation { .. })
-    ));
+    let shifted = difference.subtract(&c).unwrap();
+    assert_eq!(shifted.magnitude(), &n("-5763/20"));
+    assert_eq!(shifted.unit(), k.unit());
+    assert_eq!(shifted.scale(), Scale::Difference);
     assert!(matches!(
         difference.compare(&c),
         Err(Error::ScaleOperation { .. })
@@ -201,4 +201,69 @@ fn registered_identity_precedes_conversion() {
     );
     assert_eq!(nominal["value"]["magnitude"], "3/2");
     assert_eq!(nominal["value"]["terms"][0]["unit"], "NISTu149");
+}
+
+// Expected values are the output of unitsml-ruby 2ec9583 (unitsdb gem 2.2.15)
+// Unitsml::Quantity#+ and #- for every point/difference operand pairing.
+#[test]
+fn point_and_difference_sums_match_ruby() {
+    let db = Register::default();
+    let operand = |value, unit, difference| {
+        let unit = db.resolve(&[UnitTerm::new(unit)]).unwrap();
+        if difference {
+            Quantity::difference(n(value), unit)
+        } else {
+            Quantity::new(n(value), unit)
+        }
+    };
+    #[rustfmt::skip]
+    let cases = [
+        ("20", "degC", false, '+', "15", "degC", false, "35", "degC", Scale::Interval),
+        ("20", "degC", false, '-', "15", "degC", false, "5", "degC", Scale::Difference),
+        ("20", "degC", false, '+', "15", "degC", true, "35", "degC", Scale::Interval),
+        ("20", "degC", false, '-', "15", "degC", true, "5", "degC", Scale::Interval),
+        ("20", "degC", true, '+', "15", "degC", false, "35", "degC", Scale::Interval),
+        ("20", "degC", true, '-', "15", "degC", false, "5", "degC", Scale::Difference),
+        ("20", "degC", true, '+', "15", "degC", true, "35", "degC", Scale::Difference),
+        ("20", "degC", true, '-', "15", "degC", true, "5", "degC", Scale::Difference),
+        ("5", "K", false, '+', "20", "degC", false, "5963/20", "K", Scale::Ratio),
+        ("5", "K", false, '-', "20", "degC", false, "-5763/20", "K", Scale::Difference),
+        ("5", "K", false, '+', "20", "degC", true, "25", "K", Scale::Ratio),
+        ("5", "K", false, '-', "20", "degC", true, "-15", "K", Scale::Ratio),
+        ("5", "K", true, '+', "20", "degC", false, "5963/20", "K", Scale::Ratio),
+        ("5", "K", true, '-', "20", "degC", false, "-5763/20", "K", Scale::Difference),
+        ("5", "K", true, '+', "20", "degC", true, "25", "K", Scale::Difference),
+        ("5", "K", true, '-', "20", "degC", true, "-15", "K", Scale::Difference),
+        ("20", "degC", false, '+', "288.15", "K", false, "35", "degC", Scale::Interval),
+        ("20", "degC", false, '-', "288.15", "K", false, "5", "degC", Scale::Difference),
+        ("20", "degC", false, '+', "288.15", "K", true, "6163/20", "degC", Scale::Interval),
+        ("20", "degC", false, '-', "288.15", "K", true, "-5363/20", "degC", Scale::Interval),
+        ("20", "degC", true, '+', "288.15", "K", false, "35", "degC", Scale::Interval),
+        ("20", "degC", true, '-', "288.15", "K", false, "5", "degC", Scale::Difference),
+        ("20", "degC", true, '+', "288.15", "K", true, "6163/20", "degC", Scale::Difference),
+        ("20", "degC", true, '-', "288.15", "K", true, "-5363/20", "degC", Scale::Difference),
+    ];
+    for (lv, lu, ld, op, rv, ru, rd, magnitude, unit, scale) in cases {
+        let (left, right) = (operand(lv, lu, ld), operand(rv, ru, rd));
+        let output = match op {
+            '+' => left.add(&right),
+            _ => left.subtract(&right),
+        }
+        .unwrap();
+        let expected = operand(magnitude, unit, scale == Scale::Difference);
+        let case = format!("{lv} {lu} ({ld}) {op} {rv} {ru} ({rd})");
+        assert_eq!(
+            output.canonical_magnitude(),
+            expected.canonical_magnitude(),
+            "{case}"
+        );
+        // Ruby expresses a difference plus a point in the difference's
+        // unit; Rust expresses it in the point's unit. Same canonical value.
+        if ld && !rd && op == '+' && lu != ru {
+            continue;
+        }
+        assert_eq!(output.magnitude(), &n(magnitude), "{case}");
+        assert_eq!(output.unit(), expected.unit(), "{case}");
+        assert_eq!(output.scale(), scale, "{case}");
+    }
 }

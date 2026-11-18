@@ -1,0 +1,91 @@
+name: Release Binaries
+
+# Builds the native C ABI library per platform. Assets are uploaded only
+# to a published GitHub release (or a release tag passed to a manual run).
+# Pull requests that touch this workflow or the manifest run the build
+# without uploading anything.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to upload to (empty: build only)"
+        required: false
+  pull_request:
+    paths:
+      - ".github/workflows/release-binary.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TARGET_DIR: target
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+      - name: Build the native library
+        run: cargo +stable build --release --target ${{ matrix.target }} --lib
+      - name: Package
+        shell: bash
+        run: |
+          name="${GITHUB_REPOSITORY#*/}-${{ matrix.target }}"
+          out="dist/$name"
+          mkdir -p "$out"
+          find target/${{ matrix.target }}/release -maxdepth 1 -type f \
+            \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' -o -name '*.dll.lib' \) \
+            -exec cp {} "$out/" \;
+          ls "$out" | grep -q . || { echo "no native library was built"; exit 1; }
+          cp -R include "$out/"
+          for f in README* LICENSE* NOTICE*; do if [ -f "$f" ]; then cp "$f" "$out/"; fi; done
+          if [ "${{ runner.os }}" = Windows ]; then
+            (cd dist && 7z a "$name.zip" "$name" >/dev/null)
+            echo "ASSET=dist/$name.zip" >> "$GITHUB_ENV"
+          else
+            tar -C dist -czf "dist/$name.tar.gz" "$name"
+            echo "ASSET=dist/$name.tar.gz" >> "$GITHUB_ENV"
+          fi
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.target }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+      - name: Upload to the GitHub release
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release upload "$TAG" "$ASSET" --clobber -R "$GITHUB_REPOSITORY"

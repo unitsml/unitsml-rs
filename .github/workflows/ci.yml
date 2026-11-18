@@ -50,3 +50,30 @@ jobs:
         run: cargo +${{ matrix.rust }} test --all-targets
       - name: cargo build --lib
         run: cargo +${{ matrix.rust }} build --lib
+
+  testsuite-replay:
+    name: unitsml-testsuite replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      # Same unitsml-testsuite commit unitsml-ruby replays
+      # (unitsml-ruby spec/fixtures/testsuite-pin.yml). Move both together.
+      - name: Check out pinned unitsml-testsuite
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: unitsml/unitsml-testsuite
+          ref: 087e4ee60eb402d6436ae919f50a187faec2abb7
+          path: unitsml-testsuite
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Check formatting
+        run: cargo +stable fmt --manifest-path testsuite-replay/Cargo.toml --all -- --check
+      - name: Replay F40 and conversion corpora
+        env:
+          UNITSML_TESTSUITE_DIR: ${{ github.workspace }}/unitsml-testsuite
+        run: cargo +stable test --locked --manifest-path testsuite-replay/Cargo.toml

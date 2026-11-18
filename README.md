@@ -82,3 +82,17 @@ array of `{unit, dimensions, factor, offset?}` entries. Failures retain their
 typed algebra error or malformed-field detail. A failed decode returns no
 partially populated register. Duplicate unit definitions keep the existing
 last-entry behavior.
+
+## Testsuite replay
+
+`testsuite-replay/` is a separate, unpublished package. It replays the
+unitsml-testsuite F40 quantity rows and the conversion corpus at the commit
+unitsml-ruby pins. Unit text goes through the AsciiUnits Rust parser, which is
+a dependency of that package only. Rows that need an XML conversion-definition
+interpreter are listed as refusals with a reason. CI checks out the pinned
+testsuite and runs:
+
+```sh
+UNITSML_TESTSUITE_DIR=path/to/unitsml-testsuite \
+  cargo test --locked --manifest-path testsuite-replay/Cargo.toml
+```

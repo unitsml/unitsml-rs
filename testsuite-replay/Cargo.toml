@@ -1,0 +1,18 @@
+# Replays the pinned unitsml-testsuite corpora against unitsml-rs.
+# A separate package so the AsciiUnits parser (dev-only) and its
+# serde_json `preserve_order` feature never reach the unitsml-rs build
+# or its byte-exact wire tests. Not part of the published crate.
+[package]
+name = "unitsml-testsuite-replay"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+
+[dev-dependencies]
+unitsml-rs = { path = ".." }
+asciiunits = { git = "https://github.com/unitsml/asciiunits-rs", rev = "7a1f230516f5c08d7dd019d22044452a640cf0ff" }
+serde_json = "1.0"

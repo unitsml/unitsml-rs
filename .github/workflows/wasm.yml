@@ -1,0 +1,36 @@
+name: WASM
+
+# Compile check for the wasm32-unknown-unknown target, the TS-WASM leg
+# of the stack. Build only; nothing is published from this workflow.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TARGET_DIR: target
+  CARGO_TARGET_DIR: target
+
+jobs:
+  wasm:
+    name: wasm32-unknown-unknown
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+      - name: Build the library for wasm32 (default features)
+        run: cargo +stable build --release --target wasm32-unknown-unknown --lib
